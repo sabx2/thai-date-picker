@@ -78,13 +78,8 @@
       cursor: pointer;
     }
 
-    .month-select {
-      min-width: 120px;
-    }
-
-    .year-select {
-      min-width: 90px;
-    }
+    .month-select { min-width: 120px; }
+    .year-select { min-width: 90px; }
 
     .calendar-nav {
       background: none;
@@ -124,26 +119,10 @@
       font-size: 14px;
     }
 
-    .calendar-day:hover {
-      background: #4F46E5;
-      color: white;
-    }
-
-    .calendar-day.today {
-      background: #E0E7FF;
-      color: #4F46E5;
-      font-weight: bold;
-    }
-
-    .calendar-day.selected {
-      background: #4F46E5;
-      color: white;
-      font-weight: bold;
-    }
-
-    .calendar-day.other-month {
-      color: #bbb;
-    }
+    .calendar-day:hover { background: #4F46E5; color: white; }
+    .calendar-day.today { background: #E0E7FF; color: #4F46E5; font-weight: bold; }
+    .calendar-day.selected { background: #4F46E5; color: white; font-weight: bold; }
+    .calendar-day.other-month { color: #bbb; }
   </style>
 </head>
 <body>
@@ -197,26 +176,22 @@
     let viewDate = new Date();
     let selectedDate = null;
 
-    // สร้าง option เดือน
-    THAI_MONTHS.forEach((month, index) => {
+    // สร้างเดือน
+    THAI_MONTHS.forEach((month, i) => {
       const opt = document.createElement('option');
-      opt.value = index;
+      opt.value = i;
       opt.textContent = month;
       monthSelect.appendChild(opt);
     });
 
-    // สร้าง option ปี (±10 ปีจากปัจจุบัน)
-    function populateYears() {
-      yearSelect.innerHTML = '';
-      const currentYear = new Date().getFullYear();
-      for (let y = currentYear - 10; y <= currentYear + 10; y++) {
-        const opt = document.createElement('option');
-        opt.value = y;
-        opt.textContent = y + 543; // แสดงเป็น พ.ศ.
-        yearSelect.appendChild(opt);
-      }
+    // สร้างปี (±10 ปี)
+    const currentYear = new Date().getFullYear();
+    for (let y = currentYear - 10; y <= currentYear + 10; y++) {
+      const opt = document.createElement('option');
+      opt.value = y;
+      opt.textContent = y + 543;
+      yearSelect.appendChild(opt);
     }
-    populateYears();
 
     function updateHeader() {
       monthSelect.value = viewDate.getMonth();
@@ -229,13 +204,7 @@
       renderCalendar();
     }
 
-    function hidePopup() {
-      popup.style.display = 'none';
-    }
-
-    function togglePopup() {
-      popup.style.display === 'block' ? hidePopup() : showPopup();
-    }
+    function hidePopup() { popup.style.display = 'none'; }
 
     function renderCalendar() {
       const year = viewDate.getFullYear();
@@ -318,8 +287,8 @@
              d1.getDate() === d2.getDate();
     }
 
-    // Event Listeners
-    input.addEventListener('click', togglePopup);
+    // Events
+    input.addEventListener('click', () => popup.style.display === 'block' ? hidePopup() : showPopup());
     input.addEventListener('input', e => parseThai(e.target.value));
 
     popup.querySelector('.prev').addEventListener('click', () => {
@@ -351,9 +320,17 @@
     renderCalendar();
   }
 
-  // เริ่มต้นทุก component
   document.addEventListener('DOMContentLoaded', () => {
-    document.querySelectorAll('.thai-date-picker').forEach(initThaiDatePicker);
+    // แทรก template ลงในทุก .thai-date-picker ที่ว่าง
+    document.querySelectorAll('.thai-date-picker').forEach(container => {
+      if (container.children.length === 0) {
+        const template = document.getElementById('thai-date-picker-template').content.cloneNode(true);
+        const picker = template.querySelector('.thai-date-picker');
+        picker.dataset.target = container.dataset.target || '';
+        container.appendChild(template);
+      }
+      initThaiDatePicker(container);
+    });
   });
 </script>
 
