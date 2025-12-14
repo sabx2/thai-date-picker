@@ -1,0 +1,361 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8">
+  <title>Thai Date Picker Standalone (มีเลือกเดือน-ปี)</title>
+  <style>
+    .thai-date-picker {
+      position: relative;
+      display: inline-block;
+      width: 100%;
+      max-width: 320px;
+      font-family: 'Sarabun', 'Kanit', system-ui, sans-serif;
+    }
+
+    .thai-date-input {
+      width: 100%;
+      padding: 12px 40px 12px 16px;
+      font-size: 16px;
+      border: 2px solid #ddd;
+      border-radius: 12px;
+      background: white;
+      transition: all 0.3s ease;
+      box-sizing: border-box;
+    }
+
+    .thai-date-input:focus {
+      outline: none;
+      border-color: #4F46E5;
+      box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.2);
+    }
+
+    .calendar-icon {
+      position: absolute;
+      right: 12px;
+      top: 50%;
+      transform: translateY(-50%);
+      pointer-events: none;
+      color: #666;
+      font-size: 20px;
+    }
+
+    .calendar-popup {
+      position: absolute;
+      top: 100%;
+      left: 0;
+      right: 0;
+      margin-top: 8px;
+      background: white;
+      border: 1px solid #ddd;
+      border-radius: 12px;
+      box-shadow: 0 10px 25px rgba(0,0,0,0.15);
+      padding: 16px;
+      z-index: 1000;
+      display: none;
+    }
+
+    .calendar-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 12px;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+
+    .month-year-select {
+      display: flex;
+      gap: 8px;
+      align-items: center;
+    }
+
+    .month-select, .year-select {
+      padding: 6px 10px;
+      font-size: 15px;
+      border: 1px solid #ccc;
+      border-radius: 8px;
+      background: white;
+      cursor: pointer;
+    }
+
+    .month-select {
+      min-width: 120px;
+    }
+
+    .year-select {
+      min-width: 90px;
+    }
+
+    .calendar-nav {
+      background: none;
+      border: none;
+      font-size: 20px;
+      cursor: pointer;
+      padding: 4px 8px;
+      border-radius: 8px;
+      width: 36px;
+      height: 36px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .calendar-nav:hover { background: #f0f0f0; }
+
+    .calendar-grid {
+      display: grid;
+      grid-template-columns: repeat(7, 1fr);
+      gap: 4px;
+      text-align: center;
+    }
+
+    .calendar-day-header {
+      font-weight: bold;
+      color: #666;
+      padding: 8px 0;
+      font-size: 14px;
+    }
+
+    .calendar-day {
+      padding: 10px;
+      cursor: pointer;
+      border-radius: 8px;
+      transition: all 0.2s;
+      font-size: 14px;
+    }
+
+    .calendar-day:hover {
+      background: #4F46E5;
+      color: white;
+    }
+
+    .calendar-day.today {
+      background: #E0E7FF;
+      color: #4F46E5;
+      font-weight: bold;
+    }
+
+    .calendar-day.selected {
+      background: #4F46E5;
+      color: white;
+      font-weight: bold;
+    }
+
+    .calendar-day.other-month {
+      color: #bbb;
+    }
+  </style>
+</head>
+<body>
+
+<template id="thai-date-picker-template">
+  <div class="thai-date-picker" data-target="">
+    <input type="text" class="thai-date-input" placeholder="วว/ดด/ปปปป เช่น 14/12/2568">
+    <span class="calendar-icon">📅</span>
+    <input type="hidden" class="date-hidden-value">
+
+    <div class="calendar-popup">
+      <div class="calendar-header">
+        <button type="button" class="calendar-nav prev">‹</button>
+
+        <div class="month-year-select">
+          <select class="month-select"></select>
+          <select class="year-select"></select>
+        </div>
+
+        <button type="button" class="calendar-nav next">›</button>
+      </div>
+
+      <div class="calendar-grid">
+        <div class="calendar-day-header">อา</div>
+        <div class="calendar-day-header">จ</div>
+        <div class="calendar-day-header">อ</div>
+        <div class="calendar-day-header">พ</div>
+        <div class="calendar-day-header">พฤ</div>
+        <div class="calendar-day-header">ศ</div>
+        <div class="calendar-day-header">ส</div>
+      </div>
+    </div>
+  </div>
+</template>
+
+<script>
+  const THAI_MONTHS = ['มกราคม','กุมภาพันธ์','มีนาคม','เมษายน','พฤษภาคม','มิถุนายน',
+                       'กรกฎาคม','สิงหาคม','กันยายน','ตุลาคม','พฤศจิกายน','ธันวาคม'];
+
+  function initThaiDatePicker(root) {
+    const input = root.querySelector('.thai-date-input');
+    const hidden = root.querySelector('.date-hidden-value');
+    const targetId = root.dataset.target;
+    const externalHidden = targetId ? document.getElementById(targetId) : null;
+
+    const popup = root.querySelector('.calendar-popup');
+    const monthSelect = popup.querySelector('.month-select');
+    const yearSelect = popup.querySelector('.year-select');
+    const grid = popup.querySelector('.calendar-grid');
+
+    let viewDate = new Date();
+    let selectedDate = null;
+
+    // สร้าง option เดือน
+    THAI_MONTHS.forEach((month, index) => {
+      const opt = document.createElement('option');
+      opt.value = index;
+      opt.textContent = month;
+      monthSelect.appendChild(opt);
+    });
+
+    // สร้าง option ปี (±10 ปีจากปัจจุบัน)
+    function populateYears() {
+      yearSelect.innerHTML = '';
+      const currentYear = new Date().getFullYear();
+      for (let y = currentYear - 10; y <= currentYear + 10; y++) {
+        const opt = document.createElement('option');
+        opt.value = y;
+        opt.textContent = y + 543; // แสดงเป็น พ.ศ.
+        yearSelect.appendChild(opt);
+      }
+    }
+    populateYears();
+
+    function updateHeader() {
+      monthSelect.value = viewDate.getMonth();
+      yearSelect.value = viewDate.getFullYear();
+    }
+
+    function showPopup() {
+      popup.style.display = 'block';
+      updateHeader();
+      renderCalendar();
+    }
+
+    function hidePopup() {
+      popup.style.display = 'none';
+    }
+
+    function togglePopup() {
+      popup.style.display === 'block' ? hidePopup() : showPopup();
+    }
+
+    function renderCalendar() {
+      const year = viewDate.getFullYear();
+      const month = viewDate.getMonth();
+
+      while (grid.children.length > 7) grid.removeChild(grid.lastChild);
+
+      const firstDay = new Date(year, month, 1);
+      const startOffset = firstDay.getDay();
+      const startDate = new Date(firstDay);
+      startDate.setDate(firstDay.getDate() - startOffset);
+
+      for (let i = 0; i < 42; i++) {
+        const current = new Date(startDate);
+        current.setDate(startDate.getDate() + i);
+
+        const dayEl = document.createElement('div');
+        dayEl.className = 'calendar-day';
+        dayEl.textContent = current.getDate();
+
+        if (current.getMonth() !== month) dayEl.classList.add('other-month');
+        if (isToday(current)) dayEl.classList.add('today');
+        if (selectedDate && isSameDay(current, selectedDate)) dayEl.classList.add('selected');
+
+        if (current.getMonth() === month) {
+          dayEl.addEventListener('click', () => selectDate(current));
+        } else {
+          dayEl.style.cursor = 'default';
+        }
+
+        grid.appendChild(dayEl);
+      }
+    }
+
+    function selectDate(date) {
+      selectedDate = new Date(date);
+      input.value = formatThai(selectedDate);
+      const iso = formatISO(selectedDate);
+      hidden.value = iso;
+      if (externalHidden) externalHidden.value = iso;
+
+      root.dispatchEvent(new Event('date-selected'));
+      renderCalendar();
+      hidePopup();
+    }
+
+    function parseThai(text) {
+      const match = text.trim().match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+      if (!match) {
+        hidden.value = '';
+        if (externalHidden) externalHidden.value = '';
+        return;
+      }
+      const d = parseInt(match[1], 10);
+      const m = parseInt(match[2], 10) - 1;
+      const y = parseInt(match[3], 10) - 543;
+      const date = new Date(y, m, d);
+      if (date.getFullYear() === y && date.getMonth() === m && date.getDate() === d) {
+        selectDate(date);
+        viewDate = new Date(y, m, 1);
+      }
+    }
+
+    function formatThai(date) {
+      return String(date.getDate()).padStart(2,'0') + '/' +
+             String(date.getMonth()+1).padStart(2,'0') + '/' +
+             (date.getFullYear() + 543);
+    }
+
+    function formatISO(date) {
+      return date.getFullYear() + '-' +
+             String(date.getMonth()+1).padStart(2,'0') + '-' +
+             String(date.getDate()).padStart(2,'0');
+    }
+
+    function isToday(date) { return isSameDay(date, new Date()); }
+    function isSameDay(d1, d2) {
+      return d1.getFullYear() === d2.getFullYear() &&
+             d1.getMonth() === d2.getMonth() &&
+             d1.getDate() === d2.getDate();
+    }
+
+    // Event Listeners
+    input.addEventListener('click', togglePopup);
+    input.addEventListener('input', e => parseThai(e.target.value));
+
+    popup.querySelector('.prev').addEventListener('click', () => {
+      viewDate.setMonth(viewDate.getMonth() - 1);
+      updateHeader();
+      renderCalendar();
+    });
+
+    popup.querySelector('.next').addEventListener('click', () => {
+      viewDate.setMonth(viewDate.getMonth() + 1);
+      updateHeader();
+      renderCalendar();
+    });
+
+    monthSelect.addEventListener('change', () => {
+      viewDate.setMonth(parseInt(monthSelect.value));
+      renderCalendar();
+    });
+
+    yearSelect.addEventListener('change', () => {
+      viewDate.setFullYear(parseInt(yearSelect.value));
+      renderCalendar();
+    });
+
+    document.addEventListener('click', e => {
+      if (!root.contains(e.target)) hidePopup();
+    });
+
+    renderCalendar();
+  }
+
+  // เริ่มต้นทุก component
+  document.addEventListener('DOMContentLoaded', () => {
+    document.querySelectorAll('.thai-date-picker').forEach(initThaiDatePicker);
+  });
+</script>
+
+</body>
+</html>
